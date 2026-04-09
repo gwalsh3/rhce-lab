@@ -7,9 +7,9 @@ RHCE (EX294) exam preparation and ongoing automation reference.
 
 | Host | Role | IP |
 |------|------|----|
-| rhel10-lab-rhce | Control Node | 192.168.100.20 |
-| rhel10-lab-vm1 | Managed Node | 192.168.100.15 |
-| rhel10-lab-vm2 | Managed Node | 192.168.100.11 |
+| rhel10-lab-rhce | Control Node | xxx.xxx.xxx.xxx |
+| rhel10-lab-vm1 | Managed Node | yyy.yyy.yyy.yyy |
+| rhel10-lab-vm2 | Managed Node | zzz.zzz.zzz.zzz |
 
 - **Platform:** VirtualBox VMs on a local home lab
 - **OS:** Red Hat Enterprise Linux 10
