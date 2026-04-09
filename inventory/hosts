@@ -1,0 +1,5 @@
+#REL10 VertualBox Hosts
+[RHEL10_VMs]
+RHEL10-VM1	ansible_host=192.168.100.15
+RHEL10-VM2	ansible_host=192.168.100.11
+RHEL10-RHCE	ansible_host=192.168.100.20

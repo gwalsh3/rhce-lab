@@ -1,0 +1,98 @@
+---
+# bootstrap_ansible_user.yml
+# Run as root: ansible-playbook bootstrap_ansible_user.yml
+- name: Bootstrap Ansible User and Group
+  hosts: RHEL10_VMs
+  become: true
+
+  vars:
+    operator_user: rhce-admin
+    operator_group: ansible
+    operator_home: /home/rhce-admin
+    ansible_dirs:
+      - inventory
+      - roles
+      - playbooks
+      - group_vars
+      - host_vars
+
+  tasks:
+
+    - name: Create ansible group
+      group:
+        name: "{{ operator_group }}"
+        state: present
+
+    - name: Create ansible user
+      user:
+        name: "{{ operator_user }}"
+        group: "{{ operator_group }}"
+        home: "{{ operator_home }}"
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Deploy sudoers drop-in file for ansible group
+      copy:
+        dest: /etc/sudoers.d/ansible
+        content: "%{{ operator_group }} ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Create ansible working directory structure
+      file:
+        path: "{{ operator_home }}/ansible/{{ item }}"
+        state: directory
+        owner: "{{ operator_user }}"
+        group: "{{ operator_group }}"
+        mode: '0755'
+      loop: "{{ ansible_dirs }}"
+
+    - name: Deploy ansible.cfg
+      copy:
+        dest: "{{ operator_home }}/ansible/ansible.cfg"
+        owner: "{{ operator_user }}"
+        group: "{{ operator_group }}"
+        mode: '0644'
+        content: |
+          [defaults]
+          inventory         = ./inventory/hosts
+          remote_user       = rhce-admin
+          host_key_checking = False
+          roles_path        = ./roles
+
+          [privilege_escalation]
+          become            = True
+          become_method     = sudo
+          become_user       = root
+          become_ask_pass   = False
+
+    - name: Create .ssh directory for ansible user
+      file:
+        path: "{{ operator_home }}/.ssh"
+        state: directory
+        owner: "{{ operator_user }}"
+        group: "{{ operator_group }}"
+        mode: '0700'
+
+    - name: Generate SSH keypair for ansible user
+      command: >
+        ssh-keygen -t ed25519
+        -f {{ operator_home }}/.ssh/id_ed25519
+        -C "ansible@{{ inventory_hostname }}"
+        -N ""
+      args:
+        creates: "{{ operator_home }}/.ssh/id_ed25519"
+      become_user: "{{ operator_user }}"
+
+    - name: Set correct ownership on SSH keypair
+      file:
+        path: "{{ operator_home }}/.ssh/{{ item }}"
+        owner: "{{ operator_user }}"
+        group: "{{ operator_group }}"
+        mode: '0600'
+      loop:
+        - id_ed25519
+        - id_ed25519.pub
