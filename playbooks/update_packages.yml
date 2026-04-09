@@ -1,0 +1,35 @@
+---
+# update_packages.yml
+# Run: ansible-playbook -i inventory/hosts update_packages.yml
+- name: Update all packages and report summary
+  hosts: RHEL10_VMs
+  become: true
+
+  tasks:
+
+    - name: Run dnf/yum update on all packages
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+        update_cache: true
+      register: update_result
+
+    - name: Build list of updated packages
+      ansible.builtin.set_fact:
+        updated_packages: >-
+          {{ update_result.results | default([])
+             | select('search', 'Installed:|Upgraded:|Updated:')
+             | list }}
+
+    - name: Display update summary
+      ansible.builtin.debug:
+        msg:
+          - "===== Update Summary for {{ inventory_hostname }} ====="
+          - "Changed: {{ update_result.changed }}"
+          - "Packages affected: {{ updated_packages | length }}"
+          - "{{ updated_packages if updated_packages | length > 0 else ['All packages already up to date.'] }}"
+
+    - name: Display reboot advisory
+      ansible.builtin.debug:
+        msg: "NOTE: {{ inventory_hostname }} may require a reboot if kernel or core libraries were updated."
+      when: update_result.changed
