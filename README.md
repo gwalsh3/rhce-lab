@@ -20,15 +20,15 @@ RHCE (EX294) exam preparation and ongoing automation reference.
 
 ```
 rhce-lab/
-├── ansible.cfg              # Project-level Ansible configuration
+├── ansible.cfg                      # Project-level Ansible configuration
 ├── inventory/
-│   └── hosts                # Static inventory - VirtualBox lab hosts
+│   └── hosts                        # Static inventory - VirtualBox lab hosts
 ├── playbooks/
-│   ├── bootstrap_ansible_user.yml       # Bootstrap rhce-admin on control node
-│   └── bootstrap_managed_nodes.yml      # Bootstrap rhce-admin on managed nodes
-├── roles/                   # Custom roles (added as lab progresses)
-├── group_vars/              # Group variable files
-└── host_vars/               # Host variable files
+│   ├── bootstrap_ansible_user.yml   # Bootstrap rhce-admin on control node
+│   └── bootstrap_managed_nodes.yml  # Bootstrap rhce-admin on managed nodes
+├── roles/                           # Custom roles (added as lab progresses)
+├── group_vars/                      # Group variable files
+└── host_vars/                       # Host variable files
 ```
 ## Bootstrap Setup
 
