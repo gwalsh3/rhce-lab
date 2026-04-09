@@ -17,17 +17,19 @@ RHCE (EX294) exam preparation and ongoing automation reference.
 - **Operator User:** `rhce-admin` (dedicated non-root Ansible user)
 
 ## Repository Structure
-rhce-lab/
-├── ansible.cfg                         # Project-level Ansible configuration
-├── inventory/
-│   └── hosts                           # Static inventory - VirtualBox lab hosts
-├── playbooks/
-│   ├── bootstrap_ansible_user.yml      # Bootstrap rhce-admin on control node
-│   └── bootstrap_managed_nodes.yml     # Bootstrap rhce-admin on managed nodes
-├── roles/                              # Custom roles (added as lab progresses)
-├── group_vars/                         # Group variable files
-└── host_vars/                          # Host variable files
 
+```
+rhce-lab/
+├── ansible.cfg              # Project-level Ansible configuration
+├── inventory/
+│   └── hosts                # Static inventory - VirtualBox lab hosts
+├── playbooks/
+│   ├── bootstrap_ansible_user.yml       # Bootstrap rhce-admin on control node
+│   └── bootstrap_managed_nodes.yml      # Bootstrap rhce-admin on managed nodes
+├── roles/                   # Custom roles (added as lab progresses)
+├── group_vars/              # Group variable files
+└── host_vars/               # Host variable files
+```
 ## Bootstrap Setup
 
 These playbooks automate the initial lab environment setup. They are designed
