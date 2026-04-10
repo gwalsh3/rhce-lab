@@ -1,13 +1,20 @@
 ---
-# update_packages.yml
-# Run: ansible-playbook -i inventory/hosts update_packages.yml
-- name: Update all packages and report summary
-  hosts: RHEL10_VMs
+# update_control_node.yml
+# Run: ansible-playbook update_control_node.yml
+# Updates the Ansible control node itself (no inventory required).
+- name: Update Ansible control node
+  hosts: localhost
+  connection: local
   become: true
 
   tasks:
 
-    - name: Run dnf/yum update on all packages
+    - name: Ensure yum-utils is installed
+      ansible.builtin.dnf:
+        name: yum-utils
+        state: present
+
+    - name: Update all packages
       ansible.builtin.dnf:
         name: '*'
         state: latest
@@ -29,10 +36,15 @@
           - "Packages affected: {{ updated_packages | length }}"
           - "{{ updated_packages if updated_packages | length > 0 else ['All packages already up to date.'] }}"
 
-    - name: Ensure yum-utils is installed
-      ansible.builtin.dnf:
-        name: yum-utils
-        state: present
+    - name: Upgrade Ansible and dependencies via pip (if pip-managed)
+      ansible.builtin.pip:
+        name:
+          - ansible
+          - ansible-core
+        state: latest
+        executable: "{{ ansible_pip_executable | default('pip3') }}"
+      when: ansible_pip_managed | default(false)
+      ignore_errors: true
 
     - name: Check if reboot is required
       ansible.builtin.command: /usr/bin/needs-restarting -r
@@ -43,7 +55,7 @@
 
     - name: Reboot if kernel or core libraries were updated
       ansible.builtin.reboot:
-        msg: "Rebooting after package updates"
+        msg: "Rebooting control node after package updates"
         reboot_timeout: 300
       when:
         - update_result.changed

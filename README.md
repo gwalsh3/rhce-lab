@@ -25,7 +25,9 @@ rhce-lab/
 │   └── hosts                        # Static inventory - VirtualBox lab hosts
 ├── playbooks/
 │   ├── bootstrap_ansible_user.yml   # Bootstrap rhce-admin on control node
-│   └── bootstrap_managed_nodes.yml  # Bootstrap rhce-admin on managed nodes
+│   ├── bootstrap_managed_nodes.yml  # Bootstrap rhce-admin on managed nodes
+│   ├── update_packages.yml          # Update all packages on managed nodes; reboots if required
+│   └── update_control_node.yml      # Update the Ansible control node itself; reboots if required
 ├── roles/                           # Custom roles (added as lab progresses)
 ├── group_vars/                      # Group variable files
 └── host_vars/                       # Host variable files
@@ -66,6 +68,30 @@ ansible -i inventory/hosts RHEL10_VMs -m ping
 Expected output:
 RHEL10-VM1 | SUCCESS => { "ping": "pong" }
 RHEL10-VM2 | SUCCESS => { "ping": "pong" }
+
+## Package Management
+
+### Update Managed Nodes
+
+Updates all packages on the managed nodes. Installs `yum-utils` if not present,
+then uses `needs-restarting` to detect whether a kernel or core library update
+requires a reboot. Reboots automatically and waits for nodes to return if needed.
+
+```bash
+ansible-playbook -i inventory/hosts playbooks/update_packages.yml
+```
+
+### Update the Control Node
+
+Updates the control node itself using `localhost` with a local connection —
+no inventory required. Applies the same reboot logic as the managed node playbook.
+
+> **Note:** `ansible-core` on the control node is managed by `dnf` (rpm). Do not
+> use pip to manage Ansible on this host, as it will conflict with the rpm install.
+
+```bash
+ansible-playbook playbooks/update_control_node.yml
+```
 
 ## Usage
 
