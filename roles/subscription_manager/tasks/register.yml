@@ -1,0 +1,28 @@
+---
+- name: Check current registration status
+  ansible.builtin.command: subscription-manager status
+  register: _rhsm_status
+  ignore_errors: true
+  changed_when: false
+
+- name: Register with Red Hat Subscription Manager
+  ansible.builtin.command: >
+    subscription-manager register
+    --username={{ rhsm_username }}
+    --password={{ rhsm_password }}
+    {% if rhsm_auto_attach %}--auto-attach{% endif %}
+  when:
+    - _rhsm_status.rc != 0
+    - rhsm_username | length > 0
+    - rhsm_password | length > 0
+  no_log: true
+  register: _rhsm_register
+
+- name: List enabled repositories
+  ansible.builtin.command: subscription-manager repos --list-enabled
+  register: _enabled_repos
+  changed_when: false
+
+- name: Display enabled repositories
+  ansible.builtin.debug:
+    var: _enabled_repos.stdout_lines

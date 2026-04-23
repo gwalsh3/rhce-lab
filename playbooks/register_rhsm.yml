@@ -1,0 +1,23 @@
+---
+# Register VMs with Red Hat Subscription Manager.
+# Prompts for credentials interactively; already-registered hosts are skipped.
+#
+# Usage:
+#   ansible-playbook playbooks/register_rhsm.yml
+#   ansible-playbook playbooks/register_rhsm.yml -e target_hosts=RHEL9_VMs
+
+- name: Register with Red Hat Subscription Manager
+  hosts: "{{ target_hosts | default('RHEL10_VMs') }}"
+  become: true
+  vars_prompt:
+    - name: rhsm_username
+      prompt: "Red Hat username"
+      private: false
+    - name: rhsm_password
+      prompt: "Red Hat password"
+      private: true
+  tasks:
+    - name: Register host with RHSM
+      ansible.builtin.include_role:
+        name: subscription_manager
+        tasks_from: register.yml

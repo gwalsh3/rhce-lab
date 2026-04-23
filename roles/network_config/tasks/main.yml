@@ -1,0 +1,64 @@
+---
+- name: Skip Parallels VMs (use existing network config)
+  ansible.builtin.meta: end_host
+  when: "'Parallels' in inventory_hostname"
+
+- name: Detect non-loopback network interfaces
+  ansible.builtin.command: ip -o link show
+  register: _interfaces_raw
+  changed_when: false
+
+- name: Identify host-only adapter (second interface)
+  ansible.builtin.set_fact:
+    _detected_interface: >-
+      {{
+        _interfaces_raw.stdout_lines
+        | map('regex_search', '^[0-9]+: (\S+):', '\1')
+        | flatten | select | list
+        | reject('equalto', 'lo')
+        | list
+        | last | default(network_hostonly_interface)
+      }}
+
+- name: Deploy NetworkManager connection profile
+  ansible.builtin.template:
+    src: nmconnection.j2
+    dest: "/etc/NetworkManager/system-connections/{{ _detected_interface }}.nmconnection"
+    mode: '0600'
+  notify: Reload NetworkManager
+
+- name: Ensure NetworkManager is running and enabled
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: started
+    enabled: true
+
+- name: Flush handlers to apply NM reload immediately
+  ansible.builtin.meta: flush_handlers
+
+- name: Bring up host-only interface
+  ansible.builtin.command: nmcli connection up "{{ _detected_interface }}"
+  ignore_errors: true
+  changed_when: true
+
+- name: Update /etc/hosts with VM hostname entries
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for vm_name, vm_ip in network_vm_ips.items() %}
+      {{ vm_ip }}  {{ vm_name }}  {{ vm_name | lower | replace('-', '') }}
+      {% endfor %}
+    marker: "# {mark} {{ network_hosts_marker }}"
+  when: network_update_hosts_file
+
+- name: Test connectivity to peer VMs
+  ansible.builtin.command: ping -c 2 -W 2 "{{ item.value }}"
+  loop: "{{ network_vm_ips | dict2items | selectattr('key', '!=', inventory_hostname) | list }}"
+  register: _ping_results
+  ignore_errors: true
+  changed_when: false
+
+- name: Report peer connectivity
+  ansible.builtin.debug:
+    msg: "{{ item.item.key }} ({{ item.item.value }}): {{ 'REACHABLE' if item.rc == 0 else 'UNREACHABLE' }}"
+  loop: "{{ _ping_results.results }}"

@@ -1,0 +1,54 @@
+---
+- name: Stat CA certificate bundle
+  ansible.builtin.stat:
+    path: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
+  register: _ca_bundle
+
+- name: Calculate CA bundle age in days
+  ansible.builtin.set_fact:
+    _ca_age_days: "{{ ((ansible_date_time.epoch | int) - (_ca_bundle.stat.mtime | int)) // 86400 }}"
+  when: _ca_bundle.stat.exists
+
+- name: Test SSL connectivity to Red Hat CDN
+  ansible.builtin.uri:
+    url: "{{ cert_ssl_test_url }}"
+    method: HEAD
+    timeout: "{{ cert_ssl_timeout }}"
+    validate_certs: true
+  register: _ssl_test
+  ignore_errors: true
+
+- name: Update ca-certificates package if bundle is stale or SSL failing
+  ansible.builtin.dnf:
+    name: ca-certificates
+    state: latest
+    disable_gpg_check: true
+  register: _ca_update
+  when: >
+    (not _ca_bundle.stat.exists) or
+    (_ca_age_days | default(0) | int > cert_max_age_days) or
+    (_ssl_test.status | default(0) != 200)
+
+- name: Rebuild system trust store
+  ansible.builtin.command: update-ca-trust
+  when: _ca_update is changed
+
+- name: Re-test SSL after trust store rebuild
+  ansible.builtin.uri:
+    url: "{{ cert_ssl_test_url }}"
+    method: HEAD
+    timeout: "{{ cert_ssl_timeout }}"
+    validate_certs: true
+  register: _ssl_retest
+  ignore_errors: true
+  when: _ca_update is changed
+
+- name: Report certificate status
+  ansible.builtin.debug:
+    msg: >-
+      CA bundle: {{ (_ca_age_days | string) + ' days old' if _ca_bundle.stat.exists else 'MISSING' }} |
+      SSL: {{ 'PASS' if (_ssl_retest.status | default(_ssl_test.status | default(0))) == 200 else 'FAIL/WARN' }} |
+      Updated: {{ _ca_update is changed }}

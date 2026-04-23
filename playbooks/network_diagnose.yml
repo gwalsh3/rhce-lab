@@ -1,0 +1,79 @@
+---
+# Collect network diagnostics from RHEL VMs.
+# Read-only — makes no changes.
+#
+# Usage:
+#   ansible-playbook playbooks/network_diagnose.yml
+#   ansible-playbook playbooks/network_diagnose.yml --limit RHEL9-VM1
+
+- name: Network diagnostics
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Show network interfaces
+      ansible.builtin.command: ip addr show
+      register: _ifaces
+      changed_when: false
+
+    - ansible.builtin.debug:
+        var: _ifaces.stdout_lines
+
+    - name: Show routing table
+      ansible.builtin.command: ip route show
+      register: _routes
+      changed_when: false
+
+    - ansible.builtin.debug:
+        var: _routes.stdout_lines
+
+    - name: Show DNS configuration
+      ansible.builtin.command: cat /etc/resolv.conf
+      register: _resolv
+      changed_when: false
+
+    - ansible.builtin.debug:
+        var: _resolv.stdout_lines
+
+    - name: Ping default gateway
+      ansible.builtin.command: ping -c 3 {{ ansible_default_ipv4.gateway }}
+      register: _gw_ping
+      ignore_errors: true
+      changed_when: false
+      when: ansible_default_ipv4.gateway is defined
+
+    - ansible.builtin.debug:
+        var: _gw_ping.stdout_lines
+      when: _gw_ping is not skipped
+
+    - name: Ping external DNS server
+      ansible.builtin.command: ping -c 3 8.8.8.8
+      register: _dns_ping
+      ignore_errors: true
+      changed_when: false
+
+    - ansible.builtin.debug:
+        var: _dns_ping.stdout_lines
+
+    - name: Test Red Hat CDN connectivity
+      ansible.builtin.uri:
+        url: https://cdn.redhat.com
+        method: HEAD
+        timeout: 10
+        validate_certs: true
+      register: _cdn_test
+      ignore_errors: true
+
+    - name: Report CDN status
+      ansible.builtin.debug:
+        msg: "CDN connectivity: {{ 'OK (' + (_cdn_test.status | string) + ')' if _cdn_test.status | default(0) == 200 else 'FAIL' }}"
+
+    - name: Show NetworkManager connection status
+      ansible.builtin.command: nmcli connection show
+      register: _nm_conns
+      changed_when: false
+      ignore_errors: true
+
+    - ansible.builtin.debug:
+        var: _nm_conns.stdout_lines

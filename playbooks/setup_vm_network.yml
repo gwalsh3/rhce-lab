@@ -1,0 +1,13 @@
+---
+# Configure host-only network adapters for inter-VM communication.
+# Parallels VMs are automatically skipped (handled in the role).
+#
+# Usage:
+#   ansible-playbook playbooks/setup_vm_network.yml
+#   ansible-playbook playbooks/setup_vm_network.yml -e target_hosts=RHEL9_VMs
+
+- name: Configure host-only network for inter-VM communication
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  roles:
+    - network_config

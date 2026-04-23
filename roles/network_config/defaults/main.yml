@@ -1,0 +1,10 @@
+---
+network_hostonly_interface: enp0s8
+network_vm_ips:
+  RHEL9-VM1: "192.168.56.11"
+  RHEL9-VM2: "192.168.56.12"
+  RHEL9-VM3: "192.168.56.13"
+  RHEL10-VM1: "192.168.56.21"
+  RHEL10-VM2: "192.168.56.22"
+network_update_hosts_file: true
+network_hosts_marker: "ANSIBLE MANAGED VM HOSTS"

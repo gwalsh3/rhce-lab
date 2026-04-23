@@ -1,0 +1,15 @@
+---
+# Monthly health checks: timezone, NTP, certificates, subscription, package manager
+# Does NOT update packages — use monthly_update.yml for the full workflow.
+#
+# Usage:
+#   ansible-playbook playbooks/monthly_maintenance.yml
+#   ansible-playbook playbooks/monthly_maintenance.yml -e target_hosts=RHEL10_VMs
+
+- name: Monthly RHEL VM health checks
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  roles:
+    - ntp_sync
+    - cert_management
+    - subscription_manager

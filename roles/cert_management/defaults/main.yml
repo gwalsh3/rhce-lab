@@ -1,0 +1,4 @@
+---
+cert_max_age_days: 90
+cert_ssl_test_url: https://cdn.redhat.com
+cert_ssl_timeout: 10

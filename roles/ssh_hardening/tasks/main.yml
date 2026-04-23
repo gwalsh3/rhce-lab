@@ -1,0 +1,67 @@
+---
+- name: Ensure openssh-server is installed
+  ansible.builtin.package:
+    name: openssh-server
+    state: present
+
+- name: Apply SSH daemon configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?Port ',                line: 'Port {{ ssh_port }}' }
+    - { regexp: '^#?PermitRootLogin ',     line: 'PermitRootLogin {{ ssh_permit_root_login }}' }
+    - { regexp: '^#?PubkeyAuthentication ',line: 'PubkeyAuthentication {{ ssh_pubkey_authentication }}' }
+    - { regexp: '^#?PasswordAuthentication ', line: 'PasswordAuthentication {{ ssh_password_authentication }}' }
+    - { regexp: '^#?UsePAM ',              line: 'UsePAM {{ ssh_use_pam }}' }
+    - { regexp: '^#?X11Forwarding ',       line: 'X11Forwarding {{ ssh_x11_forwarding }}' }
+    - { regexp: '^#?ClientAliveInterval ', line: 'ClientAliveInterval {{ ssh_client_alive_interval }}' }
+    - { regexp: '^#?ClientAliveCountMax ', line: 'ClientAliveCountMax {{ ssh_client_alive_count_max }}' }
+    - { regexp: '^#?MaxAuthTries ',        line: 'MaxAuthTries {{ ssh_max_auth_tries }}' }
+    - { regexp: '^#?MaxSessions ',         line: 'MaxSessions {{ ssh_max_sessions }}' }
+  notify: Restart sshd
+
+- name: Ensure .ssh directory exists for managed user
+  ansible.builtin.file:
+    path: "{{ '/root' if ssh_managed_user == 'root' else '/home/' + ssh_managed_user }}/.ssh"
+    state: directory
+    owner: "{{ ssh_managed_user }}"
+    group: "{{ ssh_managed_user }}"
+    mode: '0700'
+
+- name: Ensure authorized_keys exists for managed user
+  ansible.builtin.file:
+    path: "{{ '/root' if ssh_managed_user == 'root' else '/home/' + ssh_managed_user }}/.ssh/authorized_keys"
+    state: touch
+    owner: "{{ ssh_managed_user }}"
+    group: "{{ ssh_managed_user }}"
+    mode: '0600'
+  changed_when: false
+
+- name: Ensure sshd is enabled and running
+  ansible.builtin.systemd:
+    name: sshd
+    state: started
+    enabled: true
+
+- name: Check firewalld status
+  ansible.builtin.command: systemctl is-active firewalld
+  register: _firewalld_active
+  changed_when: false
+  failed_when: false
+
+- name: Allow SSH through firewall
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    state: enabled
+    immediate: true
+  when:
+    - ssh_manage_firewall
+    - _firewalld_active.stdout == 'active'
+
+- name: Validate sshd configuration syntax
+  ansible.builtin.command: sshd -t
+  changed_when: false

@@ -1,0 +1,12 @@
+[connection]
+id={{ _detected_interface }}
+type=ethernet
+interface-name={{ _detected_interface }}
+autoconnect=true
+
+[ipv4]
+method=manual
+address={{ network_vm_ips[inventory_hostname] }}/24
+
+[ipv6]
+method=disabled

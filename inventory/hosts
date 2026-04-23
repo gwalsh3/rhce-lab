@@ -1,5 +1,21 @@
-#REL10 VertualBox Hosts
+# RHEL 10 VirtualBox hosts (host-only network, direct IPs)
 [RHEL10_VMs]
-RHEL10-VM1	ansible_host=192.168.100.15
-RHEL10-VM2	ansible_host=192.168.100.11
-RHEL10-RHCE	ansible_host=192.168.100.20
+RHEL10-VM1      ansible_host=192.168.100.15
+RHEL10-VM2      ansible_host=192.168.100.11
+RHEL10-RHCE     ansible_host=192.168.100.20
+
+# RHEL 9 VirtualBox hosts (NAT port forwarding)
+[RHEL9_VMs]
+RHEL9-VM1       ansible_host=localhost ansible_port=2222
+RHEL9-VM2       ansible_host=localhost ansible_port=2223
+RHEL9-VM3       ansible_host=localhost ansible_port=2224
+
+# Parallels Desktop VMs (direct IP via shared network)
+[RHEL9_Parallels_VMs]
+RHEL9-Parallels-VM1  ansible_host=10.211.55.8
+
+# Meta-group spanning all RHEL VMs
+[all_rhel_vms:children]
+RHEL10_VMs
+RHEL9_VMs
+RHEL9_Parallels_VMs

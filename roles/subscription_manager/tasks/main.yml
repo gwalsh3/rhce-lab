@@ -1,0 +1,42 @@
+---
+- name: Check subscription manager status
+  ansible.builtin.command: subscription-manager status
+  register: _rhsm_status
+  ignore_errors: true
+  changed_when: false
+
+- name: Refresh subscription entitlements
+  ansible.builtin.command: subscription-manager refresh
+  when:
+    - rhsm_auto_refresh
+    - _rhsm_status.rc == 0
+  ignore_errors: true
+
+- name: Clean DNF cache
+  ansible.builtin.command: dnf clean all
+  when: rhsm_clean_cache
+  changed_when: true
+
+- name: Test repository access
+  ansible.builtin.dnf:
+    list: updates
+    update_cache: true
+  register: _dnf_test
+  ignore_errors: true
+  when: rhsm_test_repos
+
+- name: Report available updates count
+  ansible.builtin.debug:
+    msg: >-
+      Subscription: {{ 'registered' if _rhsm_status.rc == 0 else 'unregistered/unknown' }} |
+      Package manager: {{ 'OK' if _dnf_test is succeeded else 'FAILED' }} |
+      Available updates: {{ _dnf_test.results | length if _dnf_test is succeeded else 'unknown' }}
+  when: rhsm_test_repos
+
+- name: Fail if package manager is broken
+  ansible.builtin.fail:
+    msg: "CRITICAL: Package manager health check failed on {{ inventory_hostname }}. Manual intervention required."
+  when:
+    - rhsm_test_repos
+    - rhsm_fail_on_broken
+    - _dnf_test is failed

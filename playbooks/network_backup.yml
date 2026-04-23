@@ -1,0 +1,87 @@
+---
+# Back up network configuration from RHEL VMs to the control node.
+# Archives are saved to ./network_backups/ by default.
+#
+# Usage:
+#   ansible-playbook playbooks/network_backup.yml
+#   ansible-playbook playbooks/network_backup.yml -e network_backup_local_dir=/tmp/backups
+
+- name: Backup network configuration
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  vars:
+    _staging_dir: "/tmp/netbak_{{ ansible_date_time.epoch }}"
+    network_backup_local_dir: "{{ playbook_dir }}/../network_backups"
+
+  tasks:
+    - name: Create local backup directory
+      ansible.builtin.file:
+        path: "{{ network_backup_local_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Create remote staging directory
+      ansible.builtin.file:
+        path: "{{ _staging_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Backup NetworkManager connection profiles
+      ansible.builtin.copy:
+        src: /etc/NetworkManager/system-connections/
+        dest: "{{ _staging_dir }}/nm-connections/"
+        remote_src: true
+      ignore_errors: true
+
+    - name: Backup network configuration files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ _staging_dir }}/"
+        remote_src: true
+      loop:
+        - /etc/resolv.conf
+        - /etc/hosts
+        - /etc/hostname
+      ignore_errors: true
+
+    - name: Capture live network state snapshot
+      ansible.builtin.shell: |
+        {
+          echo "=== IP Addresses ==="
+          ip addr show
+          echo -e "\n=== Routes ==="
+          ip route show
+          echo -e "\n=== DNS ==="
+          cat /etc/resolv.conf
+          echo -e "\n=== NM Connections ==="
+          nmcli connection show
+          echo -e "\n=== NM Active Connections ==="
+          nmcli connection show --active
+        } > {{ _staging_dir }}/network_state.txt
+      changed_when: false
+
+    - name: Create compressed archive
+      ansible.builtin.command:
+        cmd: "tar czf {{ _staging_dir }}.tar.gz -C {{ _staging_dir | dirname }} {{ _staging_dir | basename }}"
+      changed_when: true
+
+    - name: Fetch archive to control node
+      ansible.builtin.fetch:
+        src: "{{ _staging_dir }}.tar.gz"
+        dest: "{{ network_backup_local_dir }}/{{ inventory_hostname }}_{{ ansible_date_time.date }}.tar.gz"
+        flat: true
+
+    - name: Clean up remote staging files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ _staging_dir }}"
+        - "{{ _staging_dir }}.tar.gz"
+
+    - name: Report backup location
+      ansible.builtin.debug:
+        msg: "Saved: {{ network_backup_local_dir }}/{{ inventory_hostname }}_{{ ansible_date_time.date }}.tar.gz"

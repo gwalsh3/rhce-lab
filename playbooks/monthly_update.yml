@@ -1,0 +1,15 @@
+---
+# Full monthly workflow: health checks followed by package updates.
+# Hosts that fail maintenance checks are skipped for updates.
+#
+# Usage:
+#   ansible-playbook playbooks/monthly_update.yml
+#   ansible-playbook playbooks/monthly_update.yml -e target_hosts=RHEL10_VMs
+
+- import_playbook: monthly_maintenance.yml
+
+- name: Update RHEL VMs after health checks pass
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  roles:
+    - vm_update

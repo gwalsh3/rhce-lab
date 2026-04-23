@@ -1,0 +1,13 @@
+---
+ssh_port: 22
+ssh_permit_root_login: "prohibit-password"
+ssh_password_authentication: "no"
+ssh_pubkey_authentication: "yes"
+ssh_use_pam: "yes"
+ssh_x11_forwarding: "no"
+ssh_client_alive_interval: 120
+ssh_client_alive_count_max: 3
+ssh_max_auth_tries: 6
+ssh_max_sessions: 10
+ssh_manage_firewall: true
+ssh_managed_user: root

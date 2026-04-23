@@ -1,0 +1,14 @@
+---
+# Update all RHEL VMs (or a targeted subset)
+#
+# Usage:
+#   ansible-playbook playbooks/update_vms.yml
+#   ansible-playbook playbooks/update_vms.yml -e target_hosts=RHEL10_VMs
+#   ansible-playbook playbooks/update_vms.yml --limit RHEL9-VM1
+#   ansible-playbook playbooks/update_vms.yml --check
+
+- name: Update RHEL VMs
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  roles:
+    - vm_update

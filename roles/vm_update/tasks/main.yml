@@ -1,0 +1,147 @@
+---
+- name: Create log directory on control node
+  ansible.builtin.file:
+    path: "{{ vm_update_log_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: vm_update_logging_enabled
+
+- name: Gather targeted system facts
+  ansible.builtin.setup:
+    gather_subset:
+      - distribution
+      - kernel
+      - hardware
+      - processor
+
+- name: Snapshot pre-update state
+  ansible.builtin.shell: "{{ item }}"
+  loop:
+    - "df -h / | tail -1 | awk '{print $4}'"
+    - "rpm -qa | wc -l"
+  register: _pre_snapshot
+  changed_when: false
+
+- name: Set pre-update facts
+  ansible.builtin.set_fact:
+    _pre_disk: "{{ _pre_snapshot.results[0].stdout }}"
+    _pre_pkg_count: "{{ _pre_snapshot.results[1].stdout }}"
+
+- name: Clean DNF cache
+  ansible.builtin.command: dnf clean all
+  changed_when: true
+
+- name: Check subscription manager status
+  ansible.builtin.command: subscription-manager status
+  register: _rhsm_status
+  ignore_errors: true
+  changed_when: false
+
+- name: Refresh subscription entitlements
+  ansible.builtin.command: subscription-manager refresh
+  when: _rhsm_status.rc == 0
+  ignore_errors: true
+
+- name: Update all packages
+  block:
+    - name: Run dnf update with retries
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+        update_cache: true
+        disable_gpg_check: false
+      register: _update_result
+      retries: "{{ vm_update_max_retries }}"
+      delay: "{{ vm_update_retry_delay }}"
+      until: _update_result is succeeded
+
+  rescue:
+    - name: Log primary update failure
+      ansible.builtin.lineinfile:
+        path: "{{ vm_update_log_dir }}/vm-update-errors-{{ ansible_date_time.date }}.log"
+        line: "[{{ ansible_date_time.iso8601 }}] PRIMARY_FAILED: {{ inventory_hostname }} - {{ ansible_failed_result.msg | default('unknown') }}"
+        create: true
+      delegate_to: localhost
+      become: false
+      when: vm_update_logging_enabled
+
+    - name: Try security-only update fallback
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+        security: true
+        update_cache: true
+      register: _security_result
+      ignore_errors: true
+
+    - name: Try no-cache fallback
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+        update_cache: false
+      register: _update_result
+      ignore_errors: true
+
+    - name: Fail if all update attempts exhausted
+      ansible.builtin.fail:
+        msg: "All update attempts failed on {{ inventory_hostname }}. Manual intervention required."
+      when: _update_result is failed
+
+- name: Compare running vs installed kernel
+  ansible.builtin.shell: |
+    RUNNING=$(uname -r)
+    INSTALLED=$(rpm -q kernel --qf '%{version}-%{release}.%{arch}\n' | tail -1)
+    [[ "$RUNNING" != "$INSTALLED" ]] && echo "yes" || echo "no"
+  register: _kernel_mismatch
+  changed_when: false
+
+- name: Reboot if kernel was updated
+  ansible.builtin.reboot:
+    msg: "Reboot after dnf update - {{ ansible_date_time.iso8601 }}"
+    connect_timeout: 5
+    reboot_timeout: "{{ vm_update_reboot_timeout }}"
+    pre_reboot_delay: 0
+    post_reboot_delay: "{{ vm_update_post_reboot_delay }}"
+    test_command: whoami
+  register: _reboot_result
+  when:
+    - _update_result is succeeded
+    - _kernel_mismatch.stdout == 'yes'
+
+- name: Verify system is responsive after update
+  ansible.builtin.ping:
+  register: _ping_result
+
+- name: Snapshot post-update state
+  ansible.builtin.shell: "{{ item }}"
+  loop:
+    - "df -h / | tail -1 | awk '{print $4}'"
+    - "rpm -qa | wc -l"
+    - "uname -r"
+  register: _post_snapshot
+  changed_when: false
+
+- name: Set post-update facts
+  ansible.builtin.set_fact:
+    _post_disk: "{{ _post_snapshot.results[0].stdout }}"
+    _post_pkg_count: "{{ _post_snapshot.results[1].stdout }}"
+    _current_kernel: "{{ _post_snapshot.results[2].stdout }}"
+
+- name: Write summary log entry
+  ansible.builtin.lineinfile:
+    path: "{{ vm_update_log_dir }}/vm-update-{{ ansible_date_time.date }}.log"
+    line: >-
+      [{{ ansible_date_time.iso8601 }}] {{ inventory_hostname }} |
+      {{ ansible_distribution }} {{ ansible_distribution_version }} |
+      Kernel: {{ _current_kernel }} |
+      Packages: {{ _pre_pkg_count }}->{{ _post_pkg_count }} |
+      Disk: {{ _pre_disk }}->{{ _post_disk }} |
+      Reboot: {{ 'yes' if _reboot_result is defined else 'no' }} |
+      Status: {{ 'SUCCESS' if _ping_result is succeeded else 'FAILED' }}
+    create: true
+  delegate_to: localhost
+  become: false
+  when: vm_update_logging_enabled

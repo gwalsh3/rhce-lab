@@ -1,0 +1,13 @@
+---
+# Harden SSH daemon configuration across RHEL VMs.
+# Defaults in roles/ssh_hardening/defaults/main.yml — override with -e or group_vars.
+#
+# Usage:
+#   ansible-playbook playbooks/configure_ssh.yml
+#   ansible-playbook playbooks/configure_ssh.yml -e ssh_permit_root_login=yes
+
+- name: Harden SSH configuration
+  hosts: "{{ target_hosts | default('all_rhel_vms') }}"
+  become: true
+  roles:
+    - ssh_hardening

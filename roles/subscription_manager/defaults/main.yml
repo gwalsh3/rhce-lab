@@ -1,0 +1,8 @@
+---
+rhsm_auto_refresh: true
+rhsm_clean_cache: true
+rhsm_test_repos: true
+rhsm_fail_on_broken: true
+rhsm_username: ""
+rhsm_password: ""
+rhsm_auto_attach: true

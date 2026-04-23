@@ -1,0 +1,7 @@
+---
+vm_update_max_retries: 3
+vm_update_retry_delay: 30
+vm_update_reboot_timeout: 600
+vm_update_post_reboot_delay: 30
+vm_update_log_dir: "{{ lookup('env', 'HOME') }}/ansible-updates-logs"
+vm_update_logging_enabled: true
